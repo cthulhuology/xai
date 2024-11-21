@@ -1,0 +1,51 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%% -pa $HOME/.beamer -noshell -noinput
+%%
+%% Copyright 2024 David J Goehrig <dave@dloh.org>
+%%
+
+init() -> 
+	{ok, [[ Path ]]} = init:get_argument(home),
+	Home = lists:flatten(string:replace(Path,"\\","/",all)),
+	code:add_patha(Home ++ "/.beamer"),
+	xai:start().
+
+main(["help"]) ->
+	io:format("openai ask gpt4o-minit a question on the command line~n");
+
+main(["models"]) -> 
+	init(),
+	xai:models(),
+	receive
+	Message->
+		Data = proplists:get_value(<<"data">>,json:decode(Message)),
+		Models = [ proplists:get_value(<<"id">>, D) || D <- Data ],
+		[ io:format("~s~n", [ M ]) || M <- Models ]
+	end;
+
+main(["model",M]) -> 
+	init(),
+	xai:model(M),
+	receive
+	Message->
+		io:format("~p~n", [ json:decode(Message) ])
+	end;
+
+main([System,"--" | Args]) ->
+	init(),
+	Prompt = list_to_binary(lists:join(" ",Args)),
+	xai:chat(Prompt,System),
+	receive 
+		Message -> io:format("~s~n", [ xai:message(Message) ])
+	after 6000 -> done
+	end;
+
+main(Args) ->
+	init(),
+	Prompt = list_to_binary(lists:join(" ",Args)),
+	xai:chat(Prompt),
+	receive 
+		Message -> io:format("~s~n", [ xai:message(Message) ])
+	after 6000 -> done
+	end.
